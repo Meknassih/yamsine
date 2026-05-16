@@ -21,7 +21,11 @@ export default function GamePage() {
     scoreCategory,
     reconnect,
     clearError,
+    leaveSession,
+    debugSkipToEnd,
   } = useGameSocket();
+
+  const isDev = process.env.NODE_ENV !== "production";
 
   const reconnected = useRef(false);
 
@@ -96,7 +100,10 @@ export default function GamePage() {
                 })}
             </div>
             <button
-              onClick={() => router.push("/")}
+              onClick={() => {
+                leaveSession();
+                router.push("/");
+              }}
               className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl px-8 py-3 transition-colors"
             >
               Play again
@@ -129,7 +136,16 @@ export default function GamePage() {
           <span className="text-slate-600">·</span>
           <span className="text-slate-400 font-mono text-sm">{code}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {isDev && game && (
+            <button
+              onClick={() => debugSkipToEnd(game.lobbyCode)}
+              title="Fill all scoreboards except yours (1 turn left), then it's your turn."
+              className="text-xs font-mono uppercase tracking-wider bg-amber-900/40 hover:bg-amber-900/70 text-amber-300 border border-amber-700/60 rounded-md px-3 py-1 transition-colors"
+            >
+              dev: skip to end
+            </button>
+          )}
           <div
             className={`w-2 h-2 rounded-full ${connected ? "bg-emerald-400" : "bg-red-500"}`}
           />

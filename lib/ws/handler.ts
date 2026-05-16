@@ -8,6 +8,7 @@ import {
   applyScoreCategory,
   reconnectPlayer,
   getWinner,
+  debugSkipToEnd,
 } from "../game/engine";
 import {
   lobbies,
@@ -178,6 +179,29 @@ function handleMessage(ws: WebSocket, msg: ClientMessage): void {
       } else {
         broadcastToLobby(lobbyCode, { type: "game_updated", payload: game });
       }
+      break;
+    }
+
+    case "debug_skip_to_end": {
+      if (process.env.NODE_ENV === "production") {
+        send(ws, {
+          type: "error",
+          payload: { message: "Debug actions are disabled in production" },
+        });
+        return;
+      }
+      const { lobbyCode, clientId } = msg.payload;
+      const game = games.get(lobbyCode);
+      if (!game) {
+        send(ws, { type: "error", payload: { message: "Game not found" } });
+        return;
+      }
+      const result = debugSkipToEnd(game, clientId);
+      if (result.error) {
+        send(ws, { type: "error", payload: { message: result.error } });
+        return;
+      }
+      broadcastToLobby(lobbyCode, { type: "game_updated", payload: game });
       break;
     }
 

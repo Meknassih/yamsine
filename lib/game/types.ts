@@ -87,6 +87,10 @@ export type ClientMessage =
   | {
       type: "reconnect";
       payload: { lobbyCode: string; clientId: string };
+    }
+  | {
+      type: "debug_skip_to_end";
+      payload: { lobbyCode: string; clientId: string };
     };
 
 export type ServerMessage =

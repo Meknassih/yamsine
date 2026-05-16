@@ -83,6 +83,8 @@ export type GameSocketState = {
   scoreCategory: (lobbyCode: string, category: Category) => void;
   reconnect: (lobbyCode: string) => void;
   clearError: () => void;
+  leaveSession: () => void;
+  debugSkipToEnd: (lobbyCode: string) => void;
 };
 
 export const GameSocketContext = createContext<GameSocketState | null>(null);
@@ -269,6 +271,23 @@ export function GameSocketProvider({
 
   const clearError = useCallback(() => setError(null), []);
 
+  const debugSkipToEnd = useCallback(
+    (lobbyCode: string) => {
+      send({
+        type: "debug_skip_to_end",
+        payload: { lobbyCode, clientId },
+      });
+    },
+    [send, clientId]
+  );
+
+  const leaveSession = useCallback(() => {
+    setLobby(null);
+    setGame(null);
+    setGameOver(null);
+    setError(null);
+  }, []);
+
   const value: GameSocketState = {
     connected,
     lobby,
@@ -283,6 +302,8 @@ export function GameSocketProvider({
     scoreCategory,
     reconnect,
     clearError,
+    leaveSession,
+    debugSkipToEnd,
   };
 
   return (

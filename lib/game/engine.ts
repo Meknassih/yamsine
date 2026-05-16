@@ -135,6 +135,28 @@ export function reconnectPlayer(
   }
 }
 
+export function debugSkipToEnd(
+  gameState: GameState,
+  clientId: string
+): { error?: string } {
+  const target = gameState.players.find((p) => p.id === clientId);
+  if (!target) return { error: "Player not in game" };
+
+  for (const p of gameState.players) {
+    const card = gameState.scores[p.id];
+    const categoriesToFill =
+      p.id === clientId ? ALL_CATEGORIES.slice(0, -1) : ALL_CATEGORIES;
+    for (const cat of categoriesToFill) {
+      if (card[cat] === undefined) card[cat] = 0;
+    }
+  }
+
+  gameState.currentPlayerId = clientId;
+  gameState.rollsLeft = 3;
+  gameState.dice = gameState.dice.map((d) => ({ ...d, kept: false }));
+  return {};
+}
+
 export function getWinner(gameState: GameState): Player {
   let best: Player = gameState.players[0];
   let bestTotal = computeTotal(gameState.scores[best.id]);

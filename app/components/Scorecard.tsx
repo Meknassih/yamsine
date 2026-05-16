@@ -55,7 +55,7 @@ function ScorecardRow({
   const preview = !scored && isMyTurn && rollsLeft < 3
     ? computeScore(dice, category)
     : null;
-  const canClick = !scored && isMyTurn && rollsLeft === 0;
+  const canClick = !scored && isMyTurn && rollsLeft < 3;
 
   return (
     <tr
