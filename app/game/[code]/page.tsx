@@ -69,9 +69,9 @@ export default function GamePage() {
                 }))
                 .sort((a, b) => b.total - a.total)
                 .map(({ playerId, total }, rank) => {
-                  const player = gameOver.winner.id === playerId
-                    ? gameOver.winner
-                    : { name: `Player ${playerId.slice(0, 4)}` };
+                  const player =
+                    gameOver.players.find((p) => p.id === playerId) ??
+                    gameOver.winner;
                   return (
                     <div
                       key={playerId}

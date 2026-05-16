@@ -96,5 +96,5 @@ export type ClientMessage =
 export type ServerMessage =
   | { type: "lobby_updated"; payload: Lobby }
   | { type: "game_updated"; payload: GameState }
-  | { type: "game_over"; payload: { scores: Record<string, ScoreCard>; winner: Player } }
+  | { type: "game_over"; payload: { scores: Record<string, ScoreCard>; winner: Player; players: Player[] } }
   | { type: "error"; payload: { message: string } };

@@ -73,7 +73,7 @@ export type GameSocketState = {
   connected: boolean;
   lobby: Lobby | null;
   game: GameState | null;
-  gameOver: { scores: Record<string, ScoreCard>; winner: Player } | null;
+  gameOver: { scores: Record<string, ScoreCard>; winner: Player; players: Player[] } | null;
   error: string | null;
   clientId: string | null;
   createLobby: (playerName: string) => void;

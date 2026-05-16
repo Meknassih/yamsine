@@ -172,7 +172,7 @@ function handleMessage(ws: WebSocket, msg: ClientMessage): void {
         const winner = getWinner(game);
         broadcastToLobby(lobbyCode, {
           type: "game_over",
-          payload: { scores: game.scores, winner },
+          payload: { scores: game.scores, winner, players: game.players },
         });
         games.delete(lobbyCode);
         lobbies.delete(lobbyCode);
