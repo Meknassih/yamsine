@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useGameSocket } from "@/app/hooks/useGameSocket";
 import { Scorecard } from "@/app/components/Scorecard";
 import { DiceArea } from "@/app/components/DiceArea";
-import { computeTotal } from "@/lib/game/rules";
+import { GameOverScreen } from "@/app/components/GameOverScreen";
 import type { Category } from "@/lib/game/types";
 
 export default function GamePage() {
@@ -13,12 +13,16 @@ export default function GamePage() {
   const router = useRouter();
   const {
     connected,
+    lobby,
     game,
     gameOver,
+    playAgain,
+    kicked,
     error,
     clientId,
     rollDice,
     scoreCategory,
+    requestPlayAgain,
     reconnect,
     clearError,
     leaveSession,
@@ -39,6 +43,22 @@ export default function GamePage() {
     reconnect(code);
   }, [connected, code, reconnect, game]);
 
+  // Navigate back to the lobby once the host's "play again" countdown has
+  // expired and the lobby has been reset to the waiting state.
+  useEffect(() => {
+    if (lobby && lobby.code === code && lobby.status === "waiting" && !game && !gameOver) {
+      router.push(`/lobby/${code}`);
+    }
+  }, [lobby, game, gameOver, code, router]);
+
+  // Kicked players (didn't click Play again in time) are sent back home.
+  useEffect(() => {
+    if (kicked) {
+      leaveSession();
+      router.push("/");
+    }
+  }, [kicked, leaveSession, router]);
+
   function handleRoll(keptIndices: number[]) {
     if (!game) return;
     rollDice(game.lobbyCode, keptIndices);
@@ -51,66 +71,13 @@ export default function GamePage() {
 
   if (gameOver) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-        <div className="w-full max-w-lg">
-          <div className="bg-slate-800/60 backdrop-blur rounded-2xl p-10 border border-slate-700 shadow-2xl text-center">
-            <div className="text-6xl mb-4">🏆</div>
-            <h1 className="text-3xl font-bold text-white mb-2">Game Over!</h1>
-            <p className="text-emerald-400 text-xl font-semibold mb-8">
-              {gameOver.winner.id === clientId
-                ? "You won! 🎉"
-                : `${gameOver.winner.name} wins!`}
-            </p>
-            <div className="space-y-2 mb-8">
-              {Object.entries(gameOver.scores)
-                .map(([playerId, card]) => ({
-                  playerId,
-                  total: computeTotal(card),
-                }))
-                .sort((a, b) => b.total - a.total)
-                .map(({ playerId, total }, rank) => {
-                  const player =
-                    gameOver.players.find((p) => p.id === playerId) ??
-                    gameOver.winner;
-                  return (
-                    <div
-                      key={playerId}
-                      className={`flex justify-between items-center px-4 py-3 rounded-lg ${
-                        rank === 0
-                          ? "bg-amber-900/40 border border-amber-700"
-                          : "bg-slate-700/40"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-slate-400 text-sm w-5">
-                          {rank + 1}.
-                        </span>
-                        <span className="text-white font-medium">
-                          {player.name}
-                          {playerId === clientId ? " (you)" : ""}
-                        </span>
-                      </div>
-                      <span
-                        className={`font-bold text-lg ${rank === 0 ? "text-amber-400" : "text-slate-300"}`}
-                      >
-                        {total}
-                      </span>
-                    </div>
-                  );
-                })}
-            </div>
-            <button
-              onClick={() => {
-                leaveSession();
-                router.push("/");
-              }}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl px-8 py-3 transition-colors"
-            >
-              Play again
-            </button>
-          </div>
-        </div>
-      </main>
+      <GameOverScreen
+        gameOver={gameOver}
+        playAgain={playAgain}
+        clientId={clientId}
+        isHost={lobby?.hostId === clientId}
+        onPlayAgain={() => requestPlayAgain(code)}
+      />
     );
   }
 

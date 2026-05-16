@@ -13,6 +13,7 @@ import type {
   GameState,
   Lobby,
   Player,
+  PlayAgainState,
   ScoreCard,
   ServerMessage,
 } from "@/lib/game/types";
@@ -74,6 +75,8 @@ export type GameSocketState = {
   lobby: Lobby | null;
   game: GameState | null;
   gameOver: { scores: Record<string, ScoreCard>; winner: Player; players: Player[] } | null;
+  playAgain: PlayAgainState | null;
+  kicked: { reason: string } | null;
   error: string | null;
   clientId: string | null;
   createLobby: (playerName: string) => void;
@@ -81,6 +84,7 @@ export type GameSocketState = {
   startGame: (lobbyCode: string) => void;
   rollDice: (lobbyCode: string, keptIndices: number[]) => void;
   scoreCategory: (lobbyCode: string, category: Category) => void;
+  requestPlayAgain: (lobbyCode: string) => void;
   reconnect: (lobbyCode: string) => void;
   clearError: () => void;
   leaveSession: () => void;
@@ -100,6 +104,8 @@ export function GameSocketProvider({
   const [game, setGame] = useState<GameState | null>(null);
   const [gameOver, setGameOver] =
     useState<GameSocketState["gameOver"]>(null);
+  const [playAgain, setPlayAgain] = useState<PlayAgainState | null>(null);
+  const [kicked, setKicked] = useState<{ reason: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Read clientId from localStorage on the client; null during SSR.
   // useSyncExternalStore avoids the lint warning about setState-in-effect
@@ -172,17 +178,36 @@ export function GameSocketProvider({
       switch (msg.type) {
         case "lobby_updated":
           // The provider lives at the root and keeps state across navigations,
-          // so a fresh lobby_updated means we left any previous game/result.
+          // so a fresh lobby_updated usually means we left any previous
+          // game/result. The one exception is when the server is keeping the
+          // lobby alive in "ended" state to coordinate a play-again vote — in
+          // that case we leave game_over / play_again_state alone so they
+          // don't get clobbered when the messages arrive (e.g. on reconnect).
           setLobby(msg.payload);
-          setGame(null);
-          setGameOver(null);
+          setKicked(null);
+          if (msg.payload.status !== "ended") {
+            setGame(null);
+            setGameOver(null);
+            setPlayAgain(null);
+          }
           break;
         case "game_updated":
           setGame(msg.payload);
           setGameOver(null);
+          setPlayAgain(null);
           break;
         case "game_over":
           setGameOver(msg.payload);
+          break;
+        case "play_again_state":
+          setPlayAgain(msg.payload);
+          break;
+        case "kicked":
+          setKicked(msg.payload);
+          setLobby(null);
+          setGame(null);
+          setGameOver(null);
+          setPlayAgain(null);
           break;
         case "error":
           console.warn("[WS] server error:", msg.payload.message);
@@ -281,10 +306,22 @@ export function GameSocketProvider({
     [send, clientId]
   );
 
+  const requestPlayAgain = useCallback(
+    (lobbyCode: string) => {
+      send({
+        type: "play_again",
+        payload: { lobbyCode, clientId },
+      });
+    },
+    [send, clientId]
+  );
+
   const leaveSession = useCallback(() => {
     setLobby(null);
     setGame(null);
     setGameOver(null);
+    setPlayAgain(null);
+    setKicked(null);
     setError(null);
   }, []);
 
@@ -293,6 +330,8 @@ export function GameSocketProvider({
     lobby,
     game,
     gameOver,
+    playAgain,
+    kicked,
     error,
     clientId,
     createLobby,
@@ -300,6 +339,7 @@ export function GameSocketProvider({
     startGame,
     rollDice,
     scoreCategory,
+    requestPlayAgain,
     reconnect,
     clearError,
     leaveSession,

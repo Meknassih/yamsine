@@ -54,7 +54,20 @@ export interface Lobby {
   code: string;
   hostId: string;
   players: Player[];
-  status: "waiting" | "playing";
+  status: "waiting" | "playing" | "ended";
+}
+
+export interface PlayAgainState {
+  lobbyCode: string;
+  voters: string[];
+  hostStarted: boolean;
+  deadlineMs: number | null;
+}
+
+export interface GameOverPayload {
+  scores: Record<string, ScoreCard>;
+  winner: Player;
+  players: Player[];
 }
 
 export interface GameState {
@@ -91,10 +104,16 @@ export type ClientMessage =
   | {
       type: "debug_skip_to_end";
       payload: { lobbyCode: string; clientId: string };
+    }
+  | {
+      type: "play_again";
+      payload: { lobbyCode: string; clientId: string };
     };
 
 export type ServerMessage =
   | { type: "lobby_updated"; payload: Lobby }
   | { type: "game_updated"; payload: GameState }
-  | { type: "game_over"; payload: { scores: Record<string, ScoreCard>; winner: Player; players: Player[] } }
+  | { type: "game_over"; payload: GameOverPayload }
+  | { type: "play_again_state"; payload: PlayAgainState }
+  | { type: "kicked"; payload: { reason: string } }
   | { type: "error"; payload: { message: string } };

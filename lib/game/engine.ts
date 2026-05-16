@@ -157,6 +157,15 @@ export function debugSkipToEnd(
   return {};
 }
 
+export function resetLobbyForReplay(
+  lobby: Lobby,
+  keepClientIds: Set<string>
+): Lobby {
+  lobby.players = lobby.players.filter((p) => keepClientIds.has(p.id));
+  lobby.status = "waiting";
+  return lobby;
+}
+
 export function getWinner(gameState: GameState): Player {
   let best: Player = gameState.players[0];
   let bestTotal = computeTotal(gameState.scores[best.id]);

@@ -1,5 +1,5 @@
 import type { WebSocket } from "ws";
-import type { ClientMessage } from "../game/types";
+import type { ClientMessage, PlayAgainState } from "../game/types";
 import {
   createLobby,
   joinLobby,
@@ -9,18 +9,24 @@ import {
   reconnectPlayer,
   getWinner,
   debugSkipToEnd,
+  resetLobbyForReplay,
 } from "../game/engine";
 import {
   lobbies,
   games,
   connections,
   lobbyMembers,
+  gameOvers,
+  playAgainStates,
+  playAgainTimers,
   addConnection,
   removeConnection,
   getLobbyForClient,
   broadcastToLobby,
-  sendTo,
+  broadcastToClients,
 } from "./store";
+
+const PLAY_AGAIN_COUNTDOWN_MS = 10_000;
 
 function send(ws: WebSocket, message: object): void {
   const m = message as { type: string };
@@ -55,7 +61,14 @@ export function handleConnection(ws: WebSocket): void {
             p.id === clientId ? { ...p, connected: false } : p
           );
           const game = games.get(lobby.code);
-          if (game) {
+          if (lobby.status === "ended") {
+            // Don't clobber the game-over UI by re-broadcasting game_updated.
+            if (game) {
+              game.players = game.players.map((p) =>
+                p.id === clientId ? { ...p, connected: false } : p
+              );
+            }
+          } else if (game) {
             game.players = game.players.map((p) =>
               p.id === clientId ? { ...p, connected: false } : p
             );
@@ -169,16 +182,16 @@ function handleMessage(ws: WebSocket, msg: ClientMessage): void {
         return;
       }
       if (result.gameOver) {
-        const winner = getWinner(game);
-        broadcastToLobby(lobbyCode, {
-          type: "game_over",
-          payload: { scores: game.scores, winner, players: game.players },
-        });
-        games.delete(lobbyCode);
-        lobbies.delete(lobbyCode);
+        endGame(lobbyCode);
       } else {
         broadcastToLobby(lobbyCode, { type: "game_updated", payload: game });
       }
+      break;
+    }
+
+    case "play_again": {
+      const { lobbyCode, clientId } = msg.payload;
+      handlePlayAgain(ws, lobbyCode, clientId);
       break;
     }
 
@@ -213,7 +226,13 @@ function handleMessage(ws: WebSocket, msg: ClientMessage): void {
       addConnection(clientId, ws);
       if (!lobbyMembers.has(lobbyCode)) lobbyMembers.set(lobbyCode, new Set());
       lobbyMembers.get(lobbyCode)!.add(clientId);
-      if (game) {
+      if (lobby?.status === "ended") {
+        send(ws, { type: "lobby_updated", payload: lobby });
+        const gameOver = gameOvers.get(lobbyCode);
+        if (gameOver) send(ws, { type: "game_over", payload: gameOver });
+        const state = playAgainStates.get(lobbyCode);
+        if (state) send(ws, { type: "play_again_state", payload: state });
+      } else if (game) {
         send(ws, { type: "game_updated", payload: game });
         broadcastToLobby(lobbyCode, { type: "game_updated", payload: game });
       } else if (lobby) {
@@ -227,4 +246,95 @@ function handleMessage(ws: WebSocket, msg: ClientMessage): void {
     default:
       send(ws, { type: "error", payload: { message: "Unknown message type" } });
   }
+}
+
+function endGame(lobbyCode: string): void {
+  const game = games.get(lobbyCode);
+  const lobby = lobbies.get(lobbyCode);
+  if (!game || !lobby) return;
+  const winner = getWinner(game);
+  const payload = { scores: game.scores, winner, players: game.players };
+  gameOvers.set(lobbyCode, payload);
+  lobby.status = "ended";
+  playAgainStates.set(lobbyCode, {
+    lobbyCode,
+    voters: [],
+    hostStarted: false,
+    deadlineMs: null,
+  });
+  broadcastToLobby(lobbyCode, { type: "game_over", payload });
+}
+
+function handlePlayAgain(
+  ws: WebSocket,
+  lobbyCode: string,
+  clientId: string
+): void {
+  const lobby = lobbies.get(lobbyCode);
+  if (!lobby || lobby.status !== "ended") {
+    send(ws, { type: "error", payload: { message: "Game is not over" } });
+    return;
+  }
+  if (!lobby.players.find((p) => p.id === clientId)) {
+    send(ws, { type: "error", payload: { message: "Not a player in this lobby" } });
+    return;
+  }
+
+  const state: PlayAgainState =
+    playAgainStates.get(lobbyCode) ?? {
+      lobbyCode,
+      voters: [],
+      hostStarted: false,
+      deadlineMs: null,
+    };
+
+  if (!state.voters.includes(clientId)) state.voters = [...state.voters, clientId];
+
+  const isHost = lobby.hostId === clientId;
+  if (isHost && !state.hostStarted) {
+    state.hostStarted = true;
+    state.deadlineMs = Date.now() + PLAY_AGAIN_COUNTDOWN_MS;
+
+    const existing = playAgainTimers.get(lobbyCode);
+    if (existing) clearTimeout(existing);
+    const handle = setTimeout(() => finalizePlayAgain(lobbyCode), PLAY_AGAIN_COUNTDOWN_MS);
+    playAgainTimers.set(lobbyCode, handle);
+  }
+
+  playAgainStates.set(lobbyCode, state);
+  broadcastToLobby(lobbyCode, { type: "play_again_state", payload: state });
+}
+
+function finalizePlayAgain(lobbyCode: string): void {
+  playAgainTimers.delete(lobbyCode);
+  const lobby = lobbies.get(lobbyCode);
+  const state = playAgainStates.get(lobbyCode);
+  if (!lobby || !state) return;
+
+  const keepers = new Set(state.voters);
+  keepers.add(lobby.hostId);
+
+  const members = lobbyMembers.get(lobbyCode);
+  const kicked: string[] = [];
+  if (members) {
+    for (const memberId of members) {
+      if (!keepers.has(memberId)) kicked.push(memberId);
+    }
+  }
+
+  if (kicked.length > 0) {
+    broadcastToClients(kicked, {
+      type: "kicked",
+      payload: { reason: "You didn't click Play again in time." },
+    });
+    const memberSet = lobbyMembers.get(lobbyCode);
+    if (memberSet) for (const id of kicked) memberSet.delete(id);
+  }
+
+  resetLobbyForReplay(lobby, keepers);
+  games.delete(lobbyCode);
+  gameOvers.delete(lobbyCode);
+  playAgainStates.delete(lobbyCode);
+
+  broadcastToLobby(lobbyCode, { type: "lobby_updated", payload: lobby });
 }
