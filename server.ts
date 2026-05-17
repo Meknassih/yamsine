@@ -12,6 +12,9 @@ app.prepare().then(() => {
     handle(req, res);
   });
 
+  httpServer.keepAliveTimeout = 0;
+  httpServer.headersTimeout = 0;
+
   httpServer.listen(port, () => {
     console.log(
       `> Server listening at http://localhost:${port} [${dev ? "development" : "production"}]`

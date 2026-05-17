@@ -47,7 +47,13 @@ function getClientId(): string {
 
 const noopSubscribe = () => () => {};
 
-const POLL_INTERVAL_MS = 800;
+interface SSEPayload {
+  lobby: Lobby;
+  game?: GameState | null;
+  gameOver?: { scores: Record<string, ScoreCard>; winner: Player; players: Player[] } | null;
+  playAgain?: PlayAgainState | null;
+  version: number;
+}
 
 export type GameSocketState = {
   connected: boolean;
@@ -86,7 +92,7 @@ export function GameApiProvider({
   const [error, setError] = useState<string | null>(null);
   const versionRef = useRef(0);
   const activeCodeRef = useRef<string | null>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
   const mountedRef = useRef(true);
   const [connected, setConnected] = useState(true);
 
@@ -96,76 +102,96 @@ export function GameApiProvider({
     () => null
   );
 
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
+  const disconnectSSE = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
     activeCodeRef.current = null;
   }, []);
 
-  const startPolling = useCallback(
+  const connectSSE = useCallback(
     (code: string) => {
-      stopPolling();
+      disconnectSSE();
       activeCodeRef.current = code;
-      setConnected(true);
-      const poll = async () => {
-        if (!mountedRef.current || activeCodeRef.current !== code) return;
-        try {
-          const v = versionRef.current;
-          const res = await fetch(
-            `/api/lobby/${code}/state?clientId=${encodeURIComponent(clientId ?? "")}&version=${v}`
-          );
-          if (!res.ok) {
-            if (res.status === 404 || res.status === 403) {
-              stopPolling();
-            }
-            return;
-          }
-          const data = await res.json();
-          if (data.unchanged) {
-            versionRef.current = data.version;
-            return;
-          }
-          if (data.kicked) {
-            stopPolling();
-            setKicked(data.kicked);
-            setLobby(null);
-            setGame(null);
-            setGameOver(null);
-            setPlayAgain(null);
-            return;
-          }
-          versionRef.current = data.version;
-          setLobby(data.lobby);
-          setKicked(null);
 
-          if (data.lobby.status !== "ended") {
-            setGame(data.game ?? null);
-            setGameOver(null);
-            setPlayAgain(null);
-          } else {
-            setGame(null);
-            setGameOver(data.gameOver ?? null);
-            setPlayAgain(data.playAgain ?? null);
-          }
-          setError(null);
+      const url = `/api/lobby/${code}/events?clientId=${encodeURIComponent(clientId ?? "")}`;
+      const es = new EventSource(url);
+      eventSourceRef.current = es;
+
+      es.onopen = () => {
+        if (!mountedRef.current || activeCodeRef.current !== code) {
+          es.close();
+          return;
+        }
+        setConnected(true);
+        setKicked(null);
+      };
+
+      es.onmessage = (event) => {
+        if (!mountedRef.current || activeCodeRef.current !== code) return;
+        const eventVersion = parseInt(event.lastEventId, 10);
+        if (eventVersion <= versionRef.current) return;
+        versionRef.current = eventVersion;
+
+        let data: SSEPayload;
+        try {
+          data = JSON.parse(event.data) as SSEPayload;
         } catch {
-          // network error — will retry next poll
+          return;
+        }
+
+        setLobby(data.lobby);
+        if (data.lobby.status !== "ended") {
+          setGame(data.game ?? null);
+          setGameOver(null);
+          setPlayAgain(null);
+        } else {
+          setGame(null);
+          setGameOver(data.gameOver ?? null);
+          setPlayAgain(data.playAgain ?? null);
+        }
+        setError(null);
+      };
+
+      es.addEventListener("kicked", (event: MessageEvent) => {
+        if (!mountedRef.current || activeCodeRef.current !== code) return;
+        let reason: string;
+        try {
+          reason = (JSON.parse(event.data) as { reason: string }).reason;
+        } catch {
+          reason = "You have been removed from the game.";
+        }
+        disconnectSSE();
+        versionRef.current = 0;
+        setKicked({ reason });
+        setLobby(null);
+        setGame(null);
+        setGameOver(null);
+        setPlayAgain(null);
+      });
+
+      es.onerror = () => {
+        if (!mountedRef.current) return;
+        if (es.readyState === EventSource.CLOSED) {
+          setConnected(false);
+          if (activeCodeRef.current === code) {
+            setError("Connection lost. Refresh to reconnect.");
+          }
+        } else {
+          setConnected(false);
         }
       };
-      poll();
-      pollTimerRef.current = setInterval(poll, POLL_INTERVAL_MS);
     },
-    [stopPolling, clientId]
+    [clientId, disconnectSSE]
   );
 
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      stopPolling();
+      disconnectSSE();
     };
-  }, [stopPolling]);
+  }, [disconnectSSE]);
 
   const post = useCallback(
     async (url: string, body: object): Promise<object | null> => {
@@ -190,7 +216,7 @@ export function GameApiProvider({
   );
 
   const applyState = useCallback(
-    (data: object | null, code?: string) => {
+    (data: object | null) => {
       if (!data) return;
       const d = data as Record<string, unknown>;
       if (d.version !== undefined) versionRef.current = d.version as number;
@@ -207,9 +233,8 @@ export function GameApiProvider({
         setPlayAgain(d.playAgain as PlayAgainState | null);
       }
       if (d.error) setError(d.error as string);
-      if (code) startPolling(code);
     },
-    [startPolling]
+    []
   );
 
   const createLobby = useCallback(
@@ -228,10 +253,10 @@ export function GameApiProvider({
         setKicked(null);
         setError(null);
         versionRef.current = d.version;
-        startPolling(d.lobby.code);
+        connectSSE(d.lobby.code);
       }
     },
-    [post, clientId, startPolling]
+    [post, clientId, connectSSE]
   );
 
   const joinLobby = useCallback(
@@ -242,9 +267,10 @@ export function GameApiProvider({
         playerName,
         clientId,
       });
-      applyState(data, lobbyCode);
+      applyState(data);
+      if (data) connectSSE(lobbyCode);
     },
-    [post, clientId, applyState]
+    [post, clientId, applyState, connectSSE]
   );
 
   const startGame = useCallback(
@@ -253,7 +279,7 @@ export function GameApiProvider({
         type: "start_game",
         clientId,
       });
-      applyState(data, lobbyCode);
+      applyState(data);
     },
     [post, clientId, applyState]
   );
@@ -284,9 +310,9 @@ export function GameApiProvider({
 
   const reconnect = useCallback(
     (lobbyCode: string) => {
-      startPolling(lobbyCode);
+      connectSSE(lobbyCode);
     },
-    [startPolling]
+    [connectSSE]
   );
 
   const clearError = useCallback(() => setError(null), []);
@@ -314,7 +340,7 @@ export function GameApiProvider({
   );
 
   const leaveSession = useCallback(() => {
-    stopPolling();
+    disconnectSSE();
     versionRef.current = 0;
     setLobby(null);
     setGame(null);
@@ -322,7 +348,7 @@ export function GameApiProvider({
     setPlayAgain(null);
     setKicked(null);
     setError(null);
-  }, [stopPolling]);
+  }, [disconnectSSE]);
 
   const value: GameSocketState = {
     connected,
