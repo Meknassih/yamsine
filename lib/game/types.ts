@@ -80,7 +80,7 @@ export interface GameState {
   turn: number;
 }
 
-// WebSocket message types
+// Message types
 
 export type ClientMessage =
   | { type: "create_lobby"; payload: { playerName: string; clientId: string } }
