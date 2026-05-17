@@ -86,7 +86,7 @@ export default function LobbyPage() {
                 Players ({lobby?.players.length ?? 0}/8)
               </h2>
               {!isHost && (
-                <span className="text-slate-500 text-sm">Waiting for host…</span>
+                <span className="text-sm bg-clip-text text-transparent bg-gradient-to-r from-slate-500 from-0% via-slate-300 via-45% to-slate-500 to-55% bg-[length:200%_100%] animate-shimmer">Waiting for host…</span>
               )}
             </div>
             {lobby ? (
