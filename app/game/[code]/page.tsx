@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useGameSocket } from "@/app/hooks/useGameSocket";
+import { useIsMobile } from "@/app/hooks/useIsMobile";
 import { Scorecard } from "@/app/components/Scorecard";
 import { DiceArea } from "@/app/components/DiceArea";
+import { MobileScorecardDrawer } from "@/app/components/MobileScorecardDrawer";
 import { GameOverScreen } from "@/app/components/GameOverScreen";
 import type { Category } from "@/lib/game/types";
 
@@ -28,6 +30,9 @@ export default function GamePage() {
     leaveSession,
     debugSkipToEnd,
   } = useGameSocket();
+
+  const isMobile = useIsMobile();
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const isDev = process.env.NODE_ENV !== "production";
 
@@ -67,6 +72,7 @@ export default function GamePage() {
   function handleScore(category: Category) {
     if (!game) return;
     scoreCategory(game.lobbyCode, category);
+    setDrawerOpen(false);
   }
 
   if (gameOver) {
@@ -129,25 +135,41 @@ export default function GamePage() {
         </div>
       )}
 
-      <div className="flex-1 grid grid-cols-[380px_1fr] overflow-hidden">
-        {/* Left: Scorecard */}
-        <aside className="border-r border-slate-700/50 overflow-y-auto p-6">
-          <Scorecard
-            game={game}
-            clientId={clientId}
-            onScore={handleScore}
-          />
-        </aside>
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[380px_1fr] overflow-hidden">
+        {/* Left: Scorecard (desktop only) */}
+        {!isMobile && (
+          <aside className="border-r border-slate-700/50 overflow-y-auto p-6">
+            <Scorecard
+              game={game}
+              clientId={clientId}
+              onScore={handleScore}
+            />
+          </aside>
+        )}
 
-        {/* Right: Dice area */}
-        <section className="p-8 overflow-y-auto">
+        {/* Right (or full-width on mobile): Dice area */}
+        <section className={isMobile ? "pb-20 overflow-y-auto" : "p-8 overflow-y-auto"}>
           <DiceArea
             game={game}
             clientId={clientId}
             onRoll={handleRoll}
+            isMobile={isMobile}
+            compact={isMobile && drawerOpen}
           />
         </section>
       </div>
+
+      {/* Bottom drawer (mobile only) */}
+      {isMobile && (
+        <MobileScorecardDrawer open={drawerOpen} onToggle={() => setDrawerOpen((o) => !o)}>
+          <Scorecard
+            game={game}
+            clientId={clientId}
+            onScore={handleScore}
+            compact
+          />
+        </MobileScorecardDrawer>
+      )}
     </main>
   );
 }

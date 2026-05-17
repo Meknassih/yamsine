@@ -5,6 +5,7 @@ interface Props {
   kept: boolean;
   interactive: boolean;
   onClick?: () => void;
+  small?: boolean;
 }
 
 const DOT_POSITIONS: Record<number, [number, number][]> = {
@@ -41,7 +42,7 @@ const DOT_POSITIONS: Record<number, [number, number][]> = {
   ],
 };
 
-export function DieFace({ value, kept, interactive, onClick }: Props) {
+export function DieFace({ value, kept, interactive, onClick, small }: Props) {
   const dots = DOT_POSITIONS[value];
 
   return (
@@ -49,11 +50,12 @@ export function DieFace({ value, kept, interactive, onClick }: Props) {
       onClick={onClick}
       disabled={!interactive}
       className={[
-        "w-20 h-20 rounded-2xl shadow-lg transition-all duration-200 focus:outline-none",
+        small ? "w-12 h-12 rounded-lg" : "w-20 h-20 rounded-2xl",
+        "shadow-lg transition-all duration-200 focus:outline-none",
         interactive ? "cursor-pointer hover:scale-105 active:scale-95" : "cursor-default",
         kept
-          ? "bg-amber-400 border-4 border-amber-300 shadow-amber-500/40 shadow-lg translate-y-[-6px]"
-          : "bg-white border-4 border-slate-200",
+          ? "bg-amber-400 border-2 border-amber-300 shadow-amber-500/40 shadow-lg translate-y-[-6px]"
+          : "bg-white border-2 border-slate-200",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -65,7 +67,7 @@ export function DieFace({ value, kept, interactive, onClick }: Props) {
             key={i}
             cx={cx}
             cy={cy}
-            r={9}
+            r={small ? 6 : 9}
             className={kept ? "fill-amber-800" : "fill-slate-800"}
           />
         ))}

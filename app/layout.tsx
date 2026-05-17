@@ -3,6 +3,11 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { GameApiProvider } from "@/app/components/GameApiProvider";
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

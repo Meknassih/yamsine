@@ -32,6 +32,7 @@ interface Props {
   game: GameState;
   clientId: string | null;
   onScore: (category: Category) => void;
+  compact?: boolean;
 }
 
 interface ScorecardRowProps {
@@ -88,7 +89,7 @@ function ScorecardRow({
   );
 }
 
-export function Scorecard({ game, clientId, onScore }: Props) {
+export function Scorecard({ game, clientId, onScore, compact }: Props) {
   const isMyTurn = game.currentPlayerId === clientId;
   const myCard = clientId ? game.scores[clientId] ?? {} : {};
 
@@ -100,8 +101,8 @@ export function Scorecard({ game, clientId, onScore }: Props) {
   const total = computeTotal(myCard);
 
   return (
-    <div className="flex flex-col h-full overflow-auto">
-      <h2 className="text-white font-bold text-lg mb-4 px-1">Scorecard</h2>
+    <div className={compact ? "flex flex-col" : "flex flex-col h-full overflow-auto"}>
+      {!compact && <h2 className="text-white font-bold text-lg mb-4 px-1">Scorecard</h2>}
 
       <table className="w-full text-left mb-1">
         <thead>
