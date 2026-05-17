@@ -135,7 +135,7 @@ export function DiceArea({ game, clientId, onRoll, isMobile, compact }: Props) {
         </div>
 
         <div className="flex-1 flex items-center justify-center py-4">
-          <div className="flex flex-col gap-3 items-center">
+          <div className="grid grid-cols-2 gap-4 items-center justify-items-center">
             {game.dice.map((die, i) => (
               <div key={i} className="flex flex-col items-center gap-1">
                 <DieFace
