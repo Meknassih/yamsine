@@ -230,9 +230,11 @@ export default function Dice3D({
               die.settleProgress = 1;
             }
           }
+        } else if (phase === "idle") {
+          die.mesh.position.y = die.baseY;
         }
 
-        if (isKept && phase !== "rolling") {
+        if (isKept) {
           die.mesh.position.y += 0.4;
         }
       }
