@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, startTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useGameSocket } from "@/app/hooks/useGameSocket";
@@ -16,15 +16,13 @@ export default function Home() {
   const redirected = useRef(false);
 
   useEffect(() => {
-    if (lobby && !redirected.current) {
+    if (error) {
+      startTransition(() => setMode("idle"));
+    } else if (lobby && !redirected.current) {
       redirected.current = true;
       router.push(`/lobby/${lobby.code}`);
     }
-  }, [lobby, router]);
-
-  useEffect(() => {
-    if (error) setMode("idle");
-  }, [error]);
+  }, [error, lobby, router]);
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
