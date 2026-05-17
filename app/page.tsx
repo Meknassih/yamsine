@@ -10,7 +10,16 @@ export default function Home() {
   const { connected, lobby, error, createLobby, joinLobby, clearError } =
     useGameSocket();
 
-  const [playerName, setPlayerName] = useState("");
+  const [playerName, setPlayerName] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("yamsine_player_name") ?? "";
+    }
+    return "";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("yamsine_player_name", playerName);
+  }, [playerName]);
   const [joinCode, setJoinCode] = useState("");
   const [mode, setMode] = useState<"idle" | "creating" | "joining">("idle");
   const redirected = useRef(false);

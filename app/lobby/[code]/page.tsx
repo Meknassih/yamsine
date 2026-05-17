@@ -9,7 +9,7 @@ import { PlayerList } from "@/app/components/PlayerList";
 export default function LobbyPage() {
   const { code } = useParams<{ code: string }>();
   const router = useRouter();
-  const { connected, lobby, game, error, clientId, startGame, reconnect, clearError } =
+  const { connected, lobby, game, error, clientId, startGame, reconnect, clearError, leaveLobby } =
     useGameSocket();
 
   const [copied, setCopied] = useState(false);
@@ -113,6 +113,18 @@ export default function LobbyPage() {
                 : `Need at least 2 players (${lobby?.players.length ?? 0}/2)`}
             </button>
           )}
+
+          <div className="mt-4 text-center">
+            <button
+              onClick={async () => {
+                await leaveLobby(code);
+                router.push("/");
+              }}
+              className="text-xs font-mono uppercase tracking-wider bg-red-900/40 hover:bg-red-900/70 text-red-300 border border-red-700/60 rounded-md px-3 py-1 transition-colors"
+            >
+              Leave lobby
+            </button>
+          </div>
         </div>
       </div>
     </main>

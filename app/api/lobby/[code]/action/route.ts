@@ -132,6 +132,41 @@ export async function POST(
       return NextResponse.json({ game });
     }
 
+    case "leave_lobby": {
+      members?.delete(clientId);
+      lobby.players = lobby.players.filter((p) => p.id !== clientId);
+
+      if (lobby.hostId === clientId && lobby.players.length > 0) {
+        lobby.hostId = lobby.players[0].id;
+      }
+
+      if (lobby.players.length === 0) {
+        lobbies.delete(code);
+        games.delete(code);
+        gameOvers.delete(code);
+        playAgainStates.delete(code);
+        lobbyMembers.delete(code);
+        const timer = playAgainTimers.get(code);
+        if (timer) {
+          clearTimeout(timer);
+          playAgainTimers.delete(code);
+        }
+      } else if (lobby.players.length < 2 && games.has(code)) {
+        lobby.status = "waiting";
+        games.delete(code);
+        gameOvers.delete(code);
+        playAgainStates.delete(code);
+        const timer = playAgainTimers.get(code);
+        if (timer) {
+          clearTimeout(timer);
+          playAgainTimers.delete(code);
+        }
+      }
+
+      incrementVersion(code);
+      return NextResponse.json({ success: true });
+    }
+
     case "leave_game": {
       const game = games.get(code);
       if (!game) {
