@@ -28,6 +28,7 @@ export default function GamePage() {
     requestPlayAgain,
     reconnect,
     clearError,
+    leaveGame,
     leaveSession,
     debugSkipToEnd,
   } = useGameSocket();
@@ -76,6 +77,12 @@ export default function GamePage() {
     setDrawerOpen(false);
   }
 
+  async function handleLeave() {
+    if (!game) return;
+    await leaveGame(game.lobbyCode);
+    router.push("/");
+  }
+
   if (gameOver) {
     return (
       <GameOverScreen
@@ -111,6 +118,12 @@ export default function GamePage() {
           <span className="text-slate-400 font-mono text-sm">{code}</span>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleLeave}
+            className="text-xs font-mono uppercase tracking-wider bg-red-900/40 hover:bg-red-900/70 text-red-300 border border-red-700/60 rounded-md px-3 py-1 transition-colors"
+          >
+            Leave
+          </button>
           {isDev && game && (
             <button
               onClick={() => debugSkipToEnd(game.lobbyCode)}

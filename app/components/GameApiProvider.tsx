@@ -72,6 +72,7 @@ export type GameSocketState = {
   requestPlayAgain: (lobbyCode: string) => void;
   reconnect: (lobbyCode: string) => void;
   clearError: () => void;
+  leaveGame: (lobbyCode: string) => Promise<void>;
   leaveSession: () => void;
   debugSkipToEnd: (lobbyCode: string) => void;
 };
@@ -350,6 +351,17 @@ export function GameApiProvider({
     setError(null);
   }, [disconnectSSE]);
 
+  const leaveGame = useCallback(
+    async (lobbyCode: string) => {
+      await post(`/api/lobby/${lobbyCode}/action`, {
+        type: "leave_game",
+        clientId,
+      });
+      leaveSession();
+    },
+    [post, clientId, leaveSession]
+  );
+
   const value: GameSocketState = {
     connected,
     lobby,
@@ -367,6 +379,7 @@ export function GameApiProvider({
     requestPlayAgain,
     reconnect,
     clearError,
+    leaveGame,
     leaveSession,
     debugSkipToEnd,
   };

@@ -7,6 +7,7 @@ import {
   debugSkipToEnd,
   getWinner,
   resetLobbyForReplay,
+  removePlayerFromGame,
 } from "@/lib/game/engine";
 import {
   lobbies,
@@ -129,6 +130,41 @@ export async function POST(
       }
       incrementVersion(code);
       return NextResponse.json({ game });
+    }
+
+    case "leave_game": {
+      const game = games.get(code);
+      if (!game) {
+        return NextResponse.json({ error: "Game not found" }, { status: 404 });
+      }
+
+      members?.delete(clientId);
+      lobby.players = lobby.players.filter((p) => p.id !== clientId);
+      removePlayerFromGame(game, clientId);
+
+      if (lobby.hostId === clientId && game.players.length > 0) {
+        lobby.hostId = game.players[0].id;
+      }
+
+      if (game.players.length < 2) {
+        lobby.status = "waiting";
+        games.delete(code);
+        gameOvers.delete(code);
+        playAgainStates.delete(code);
+        const timer = playAgainTimers.get(code);
+        if (timer) {
+          clearTimeout(timer);
+          playAgainTimers.delete(code);
+        }
+      }
+
+      kickedClients.set(clientId, {
+        lobbyCode: code,
+        reason: "You left the game.",
+      });
+
+      incrementVersion(code);
+      return NextResponse.json({ success: true });
     }
 
     default:

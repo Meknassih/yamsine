@@ -166,6 +166,24 @@ export function resetLobbyForReplay(
   return lobby;
 }
 
+export function removePlayerFromGame(
+  gameState: GameState,
+  playerId: string
+): void {
+  const wasCurrentPlayer = gameState.currentPlayerId === playerId;
+  const leavingIndex = gameState.players.findIndex((p) => p.id === playerId);
+
+  gameState.players = gameState.players.filter((p) => p.id !== playerId);
+  delete gameState.scores[playerId];
+
+  if (wasCurrentPlayer && gameState.players.length > 0) {
+    const nextIndex = leavingIndex % gameState.players.length;
+    gameState.currentPlayerId = gameState.players[nextIndex].id;
+    gameState.rollsLeft = 3;
+    gameState.dice = gameState.dice.map((d) => ({ ...d, kept: false }));
+  }
+}
+
 export function getWinner(gameState: GameState): Player {
   let best: Player = gameState.players[0];
   let bestTotal = computeTotal(gameState.scores[best.id]);
