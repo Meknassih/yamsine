@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useGameSocket } from "@/app/hooks/useGameSocket";
 
@@ -44,7 +45,7 @@ export default function Home() {
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <h1 className="text-6xl font-bold text-white tracking-tight mb-2">
-            🎲 Yamsine
+            <Link href="/" className="hover:text-slate-200 transition-colors">🎲 Yamsine</Link>
           </h1>
           <p className="text-slate-400 text-lg">Multiplayer Yams online</p>
           <div className="mt-2 flex items-center justify-center gap-2">

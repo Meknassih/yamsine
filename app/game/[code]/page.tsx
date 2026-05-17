@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useGameSocket } from "@/app/hooks/useGameSocket";
 import { useIsMobile } from "@/app/hooks/useIsMobile";
@@ -105,7 +106,7 @@ export default function GamePage() {
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
       <header className="flex items-center justify-between px-6 py-3 border-b border-slate-700/50">
         <div className="flex items-center gap-3">
-          <span className="text-white font-bold text-xl">🎲 Yamsine</span>
+          <Link href="/" className="text-white font-bold text-xl hover:text-slate-200 transition-colors">🎲 Yamsine</Link>
           <span className="text-slate-600">·</span>
           <span className="text-slate-400 font-mono text-sm">{code}</span>
         </div>
