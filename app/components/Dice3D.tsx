@@ -8,8 +8,8 @@ import { getDieTextures } from "./diceTextures";
 const TARGET_EULER: Record<number, THREE.Euler> = {
   1: new THREE.Euler(0, 0, 0),
   2: new THREE.Euler(-Math.PI / 2, 0, 0),
-  3: new THREE.Euler(0, 0, -Math.PI / 2),
-  4: new THREE.Euler(0, 0, Math.PI / 2),
+  3: new THREE.Euler(0, 0, Math.PI / 2),
+  4: new THREE.Euler(0, 0, -Math.PI / 2),
   5: new THREE.Euler(Math.PI / 2, 0, 0),
   6: new THREE.Euler(Math.PI, 0, 0),
 };
