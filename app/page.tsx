@@ -10,12 +10,12 @@ export default function Home() {
   const { connected, lobby, error, createLobby, joinLobby, clearError } =
     useGameSocket();
 
-  const [playerName, setPlayerName] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("yamsine_player_name") ?? "";
-    }
-    return "";
-  });
+  const [playerName, setPlayerName] = useState("");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("yamsine_player_name");
+    if (saved) setPlayerName(saved); // eslint-disable-line react-hooks/set-state-in-effect
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("yamsine_player_name", playerName);

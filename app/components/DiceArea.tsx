@@ -1,8 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import type { GameState } from "@/lib/game/types";
-import { DieFace } from "./DieFace";
+import { useGameSocket } from "@/app/hooks/useGameSocket";
+
+const Dice3D = dynamic(() => import("./Dice3D"), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="bg-slate-800/40 rounded-2xl animate-pulse flex items-center justify-center"
+      style={{ minHeight: 200 }}
+    >
+      <span className="text-slate-500 text-sm">Loading dice…</span>
+    </div>
+  ),
+});
 
 interface Props {
   game: GameState;
@@ -13,12 +26,11 @@ interface Props {
 }
 
 export function DiceArea({ game, clientId, onRoll, isMobile, compact }: Props) {
+  const { isRolling } = useGameSocket();
   const isMyTurn = game.currentPlayerId === clientId;
-  const canRoll = isMyTurn && game.rollsLeft > 0;
+  const canRoll = isMyTurn && game.rollsLeft > 0 && !isRolling;
   const mustScore = isMyTurn && game.rollsLeft === 0;
 
-  // Local toggle overrides keyed by die index.
-  // Resets automatically when server dice change (diceKey changes).
   const diceKey = game.dice.map((d) => `${d.value}:${d.kept}`).join(",");
   const [toggles, setToggles] = useState<Record<number, boolean>>({});
   const [lastKey, setLastKey] = useState(diceKey);
@@ -58,34 +70,65 @@ export function DiceArea({ game, clientId, onRoll, isMobile, compact }: Props) {
           ? "1 roll left"
           : "No rolls left — pick a category";
 
+  const diceValues = game.dice.map((d) => d.value);
+  const showKeepToggles =
+    isMyTurn && game.rollsLeft < 3 && game.rollsLeft > 0;
+
+  const keptFlags = game.dice.map((_d, i) => localKept[i] ?? false);
+
+  const keepToggleRow = showKeepToggles ? (
+    <div className="flex justify-center gap-4 mt-2">
+      {game.dice.map((die, i) => (
+        <button
+          key={i}
+          onClick={() => toggleKeep(i)}
+          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+            localKept[i]
+              ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+              : "bg-slate-700/40 text-slate-500 border border-slate-600/30 hover:border-slate-500/50"
+          }`}
+        >
+          <span>{die.value}</span>
+          <span className="text-[10px] opacity-70">
+            {localKept[i] ? "Kept" : "Reroll"}
+          </span>
+        </button>
+      ))}
+    </div>
+  ) : null;
+
   // ---- Compact layout (mobile with drawer open) ----
   if (isMobile && compact) {
     return (
-      <div className="flex items-center gap-3 px-4 py-3 bg-slate-800/60 border-b border-slate-700/50">
-        <div className="flex gap-1.5 flex-shrink-0">
-          {game.dice.map((die, i) => (
-            <div key={i} className="relative">
-              <DieFace
-                value={die.value}
-                kept={localKept[i] ?? false}
-                interactive={isMyTurn && game.rollsLeft < 3 && game.rollsLeft > 0}
-                onClick={() => toggleKeep(i)}
-                small
-              />
-              {isMyTurn && game.rollsLeft < 3 && game.rollsLeft > 0 && (
-                <span
-                  className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-bold ${
-                    localKept[i] ? "text-amber-400" : "text-slate-500"
-                  }`}
-                >
-                  {localKept[i] ? "K" : "R"}
-                </span>
-              )}
-            </div>
-          ))}
+      <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/60 border-b border-slate-700/50">
+        <div className="flex-1 min-w-0" style={{ height: 72 }}>
+          <Dice3D
+            values={diceValues}
+            rolling={isRolling}
+            kept={keptFlags}
+          />
         </div>
 
-        <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+        {showKeepToggles && (
+          <div className="flex gap-1 flex-shrink-0">
+            {game.dice.map((die, i) => (
+              <button
+                key={i}
+                onClick={() => toggleKeep(i)}
+                className={`flex flex-col items-center w-8 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                  localKept[i]
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                    : "bg-slate-700/40 text-slate-500 border border-slate-600/30"
+                }`}
+              >
+                <span>{die.value}</span>
+                <span>{localKept[i] ? "K" : "R"}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 flex-shrink-0">
           {isMyTurn ? (
             mustScore ? (
               <span className="text-amber-400 text-xs font-medium whitespace-nowrap">
@@ -114,7 +157,7 @@ export function DiceArea({ game, clientId, onRoll, isMobile, compact }: Props) {
   if (isMobile) {
     return (
       <div className="flex flex-col h-full">
-        <div className="mb-6">
+        <div className="mb-4">
           <div className="flex items-center gap-3 mb-1">
             <div
               className={`w-3 h-3 rounded-full flex-shrink-0 ${currentPlayer?.connected ? "bg-emerald-400" : "bg-slate-500"}`}
@@ -134,25 +177,15 @@ export function DiceArea({ game, clientId, onRoll, isMobile, compact }: Props) {
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center py-4">
-          <div className="grid grid-cols-2 gap-4 items-center justify-items-center">
-            {game.dice.map((die, i) => (
-              <div key={i} className="flex flex-col items-center gap-1">
-                <DieFace
-                  value={die.value}
-                  kept={localKept[i] ?? false}
-                  interactive={isMyTurn && game.rollsLeft < 3 && game.rollsLeft > 0}
-                  onClick={() => toggleKeep(i)}
-                />
-                {isMyTurn && game.rollsLeft < 3 && game.rollsLeft > 0 && (
-                  <span className={`text-xs ${localKept[i] ? "text-amber-400" : "text-slate-600"}`}>
-                    {localKept[i] ? "Kept" : "Reroll"}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
+        <div className="flex-1 min-h-0" style={{ minHeight: 240 }}>
+          <Dice3D
+            values={diceValues}
+            rolling={isRolling}
+            kept={keptFlags}
+          />
         </div>
+
+        {keepToggleRow}
 
         <div className="flex flex-col items-center gap-3 py-4">
           {isMyTurn ? (
@@ -219,10 +252,10 @@ export function DiceArea({ game, clientId, onRoll, isMobile, compact }: Props) {
     );
   }
 
-  // ---- Desktop layout (unchanged) ----
+  // ---- Desktop layout ----
   return (
     <div className="flex flex-col h-full">
-      <div className="mb-6">
+      <div className="mb-4">
         <div className="flex items-center gap-3 mb-1">
           <div
             className={`w-3 h-3 rounded-full flex-shrink-0 ${currentPlayer?.connected ? "bg-emerald-400" : "bg-slate-500"}`}
@@ -242,25 +275,15 @@ export function DiceArea({ game, clientId, onRoll, isMobile, compact }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center py-8">
-        <div className="flex flex-wrap gap-5 justify-center">
-          {game.dice.map((die, i) => (
-            <div key={i} className="flex flex-col items-center gap-2">
-              <DieFace
-                value={die.value}
-                kept={localKept[i] ?? false}
-                interactive={isMyTurn && game.rollsLeft < 3 && game.rollsLeft > 0}
-                onClick={() => toggleKeep(i)}
-              />
-              {isMyTurn && game.rollsLeft < 3 && game.rollsLeft > 0 && (
-                <span className={`text-xs ${localKept[i] ? "text-amber-400" : "text-slate-600"}`}>
-                  {localKept[i] ? "Kept" : "Reroll"}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
+      <div className="flex-1 min-h-0" style={{ minHeight: 260 }}>
+        <Dice3D
+          values={diceValues}
+          rolling={isRolling}
+          kept={keptFlags}
+        />
       </div>
+
+      {keepToggleRow}
 
       <div className="flex flex-col items-center gap-3 py-4">
         {isMyTurn ? (

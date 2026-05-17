@@ -64,6 +64,7 @@ export type GameSocketState = {
   kicked: { reason: string } | null;
   error: string | null;
   clientId: string | null;
+  isRolling: boolean;
   createLobby: (playerName: string) => void;
   joinLobby: (lobbyCode: string, playerName: string) => void;
   startGame: (lobbyCode: string) => void;
@@ -92,11 +93,35 @@ export function GameApiProvider({
   const [playAgain, setPlayAgain] = useState<PlayAgainState | null>(null);
   const [kicked, setKicked] = useState<{ reason: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isRolling, setIsRolling] = useState(false);
   const versionRef = useRef(0);
   const activeCodeRef = useRef<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const mountedRef = useRef(true);
   const [connected, setConnected] = useState(true);
+
+  const isRollingRef = useRef(false);
+  const rollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const diceKeyRef = useRef("");
+  const prevPlayerIdRef = useRef("");
+  const ROLL_DURATION = 800;
+
+  useEffect(() => {
+    if (game) {
+      diceKeyRef.current = game.dice.map((d) => d.value).join(",");
+      prevPlayerIdRef.current = game.currentPlayerId;
+    }
+  }, [game]);
+
+  const startRolling = useCallback(() => {
+    isRollingRef.current = true;
+    setIsRolling(true);
+    if (rollTimerRef.current) clearTimeout(rollTimerRef.current);
+    rollTimerRef.current = setTimeout(() => {
+      isRollingRef.current = false;
+      setIsRolling(false);
+    }, ROLL_DURATION);
+  }, []);
 
   const clientId = useSyncExternalStore(
     noopSubscribe,
@@ -143,6 +168,18 @@ export function GameApiProvider({
           return;
         }
 
+        const newGame = data.game;
+        if (newGame && diceKeyRef.current !== "") {
+          const newDiceKey = newGame.dice.map((d) => d.value).join(",");
+          const diceChanged = newDiceKey !== diceKeyRef.current;
+          const turnChanged = newGame.currentPlayerId !== prevPlayerIdRef.current;
+          if (diceChanged && !turnChanged && !isRollingRef.current) {
+            startRolling();
+          }
+          diceKeyRef.current = newDiceKey;
+          prevPlayerIdRef.current = newGame.currentPlayerId;
+        }
+
         setLobby(data.lobby);
         if (data.lobby.status !== "ended") {
           setGame(data.game ?? null);
@@ -185,13 +222,14 @@ export function GameApiProvider({
         }
       };
     },
-    [clientId, disconnectSSE]
+    [clientId, disconnectSSE, startRolling]
   );
 
   useEffect(() => {
     return () => {
       mountedRef.current = false;
       disconnectSSE();
+      if (rollTimerRef.current) clearTimeout(rollTimerRef.current);
     };
   }, [disconnectSSE]);
 
@@ -288,6 +326,7 @@ export function GameApiProvider({
 
   const rollDice = useCallback(
     async (lobbyCode: string, keptIndices: number[]) => {
+      startRolling();
       const data = await post(`/api/lobby/${lobbyCode}/action`, {
         type: "roll_dice",
         clientId,
@@ -295,7 +334,7 @@ export function GameApiProvider({
       });
       applyState(data);
     },
-    [post, clientId, applyState]
+    [post, clientId, applyState, startRolling]
   );
 
   const scoreCategory = useCallback(
@@ -383,6 +422,7 @@ export function GameApiProvider({
     kicked,
     error,
     clientId,
+    isRolling,
     createLobby,
     joinLobby,
     startGame,
