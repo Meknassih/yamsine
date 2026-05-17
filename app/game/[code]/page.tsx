@@ -116,7 +116,7 @@ export default function GamePage() {
               title="Fill all scoreboards except yours (1 turn left), then it's your turn."
               className="text-xs font-mono uppercase tracking-wider bg-amber-900/40 hover:bg-amber-900/70 text-amber-300 border border-amber-700/60 rounded-md px-3 py-1 transition-colors"
             >
-              dev: skip to end
+              skip
             </button>
           )}
           <div

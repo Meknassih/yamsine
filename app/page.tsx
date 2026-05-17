@@ -21,6 +21,10 @@ export default function Home() {
     }
   }, [lobby, router]);
 
+  useEffect(() => {
+    if (error) setMode("idle");
+  }, [error]);
+
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!playerName.trim()) return;
