@@ -25,8 +25,8 @@ export function scoreUpper(dice: Die[], face: number): number {
 export function scoreThreeOfAKind(dice: Die[]): number {
   const vals = values(dice);
   const c = counts(vals);
-  for (const cnt of c.values()) {
-    if (cnt >= 3) return sum(vals);
+  for (const pair of c) {
+    if (pair[1] >= 3) return pair[0] * 3;
   }
   return 0;
 }
@@ -34,8 +34,8 @@ export function scoreThreeOfAKind(dice: Die[]): number {
 export function scoreFourOfAKind(dice: Die[]): number {
   const vals = values(dice);
   const c = counts(vals);
-  for (const cnt of c.values()) {
-    if (cnt >= 4) return sum(vals);
+  for (const pair of c) {
+    if (pair[1] >= 4) return pair[0] * 4;
   }
   return 0;
 }
